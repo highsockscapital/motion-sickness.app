@@ -333,11 +333,8 @@ class MotionOverlayService : LifecycleService() {
             overlayView = composeView
             windowManager.addView(composeView, params)
             android.util.Log.i("MotionOverlayService", "overlay attached successfully")
-        } catch (e: SecurityException) {
-            android.util.Log.e("MotionOverlayService", "addView SecurityException (overlay perm denied)", e)
-            overlayView = null
-            throw e
         } catch (e: Exception) {
+            android.util.Log.e("MotionOverlay", "Error launching overlay", e)
             android.util.Log.e("MotionOverlayService", "addView failed", e)
             overlayView = null
             throw e

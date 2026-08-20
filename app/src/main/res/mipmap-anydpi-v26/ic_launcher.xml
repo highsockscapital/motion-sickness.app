@@ -2,6 +2,6 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Solid color background - #0420F6 -->
     <background android:drawable="@color/ic_launcher_background" />
-    <!-- Solid color foreground - same #0420F6 for minimal plain icon (no vector/logo) -->
-    <foreground android:drawable="@color/ic_launcher_background" />
+    <!-- Foreground must be a drawable, not a color - use vector solid fill -->
+    <foreground android:drawable="@drawable/ic_launcher_background" />
 </adaptive-icon>

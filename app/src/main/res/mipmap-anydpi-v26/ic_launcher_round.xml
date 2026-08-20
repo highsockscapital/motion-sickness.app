@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Solid color background - #0420F6 -->
     <background android:drawable="@color/ic_launcher_background" />
-    <!-- Solid color foreground - same #0420F6 for minimal plain icon -->
-    <foreground android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_background" />
 </adaptive-icon>

@@ -17,8 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -93,8 +94,8 @@ fun MotionCuesOverlay(
     // Use withFrameNanos instead of standard state triggers / infiniteTransition for buttery smooth
     // This drives animation directly from vsync frame time, keeping CPU/battery minimal
     // Maintains continuous animation state across rotation (remembered outside BoxWithConstraints)
-    var startNanos by remember { androidx.compose.runtime.mutableStateOf(0L) }
-    var currentNanos by remember { androidx.compose.runtime.mutableStateOf(0L) }
+    var startNanos by remember { mutableStateOf(0L) }
+    var currentNanos by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
         // Capture initial frame time as anchor - preserved across recompositions

@@ -93,8 +93,8 @@ fun MotionCuesOverlay(
     // Use withFrameNanos instead of standard state triggers / infiniteTransition for buttery smooth
     // This drives animation directly from vsync frame time, keeping CPU/battery minimal
     // Maintains continuous animation state across rotation (remembered outside BoxWithConstraints)
-    var startNanos by remember { mutableLongStateOf(0L) }
-    var currentNanos by remember { mutableLongStateOf(0L) }
+    var startNanos by remember { androidx.compose.runtime.mutableStateOf(0L) }
+    var currentNanos by remember { androidx.compose.runtime.mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
         // Capture initial frame time as anchor - preserved across recompositions

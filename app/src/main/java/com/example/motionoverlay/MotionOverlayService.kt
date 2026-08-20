@@ -59,22 +59,41 @@ class MotionOverlayService : LifecycleService() {
 
     // For ComposeView to work in a Service, we need to provide a SavedStateRegistryOwner
     // LifecycleService already provides Lifecycle, but not SavedStateRegistryOwner.
-    // We create a small holder that delegates to a controller.
-    private val savedStateRegistryController = SavedStateRegistryController.create(this)
-    private val savedStateRegistryOwner = object : SavedStateRegistryOwner {
-        private val lifecycleRegistry = LifecycleRegistry(this)
-        override val lifecycle: Lifecycle get() = lifecycleRegistry
-        override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
-        init {
-            savedStateRegistryController.performAttach()
-            savedStateRegistryController.performRestore(null)
-            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        }
-    }
+    // We create a small holder that delegates to a controller. The controller is
+    // initialized lazily to avoid circular dependency (owner references controller
+    // and controller needs owner).
     private val viewModelStore = ViewModelStore()
-    private val viewModelStoreOwner = ViewModelStoreOwner { viewModelStore }
+    private val viewModelStoreOwner = object : ViewModelStoreOwner {
+        override val viewModelStore: ViewModelStore get() = this@MotionOverlayService.viewModelStore
+    }
+
+    // Lifecycle for the fake SavedStateRegistryOwner - separately owned so it
+    // does not clash with LifecycleService's own lifecycle
+    private val overlayLifecycleRegistry = LifecycleRegistry(this)
+
+    // SavedStateRegistryOwner for ComposeView - uses a lazy controller to break
+    // the circular reference (owner.getSavedStateRegistry() delegates to controller)
+    private val savedStateRegistryOwner: SavedStateRegistryOwner
+    private val savedStateRegistryController: SavedStateRegistryController
+
+    init {
+        // Create a temporary holder to allow controller creation before the owner
+        // is fully initialized; the owner's getter references the controller which
+        // will be assigned immediately afterwards.
+        lateinit var controller: SavedStateRegistryController
+        val owner = object : SavedStateRegistryOwner {
+            override val lifecycle: Lifecycle get() = overlayLifecycleRegistry
+            override val savedStateRegistry: SavedStateRegistry get() = controller.savedStateRegistry
+        }
+        controller = SavedStateRegistryController.create(owner)
+        controller.performAttach()
+        controller.performRestore(null)
+        overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        savedStateRegistryOwner = owner
+        savedStateRegistryController = controller
+    }
 
     // Auto-dismiss sleep timer - lightweight Coroutine countdown
     private var timerJob: Job? = null

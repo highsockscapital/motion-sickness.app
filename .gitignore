@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+build/
+app/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Signing
+*.jks
+*.keystore
+
+# APK (keep releases via GitHub, ignore local)
+# app-debug.apk not ignored so we handle via release asset

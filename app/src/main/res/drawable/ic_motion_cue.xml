@@ -1,0 +1,50 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+
+    <!-- Central solid circle - primary focus dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,12m -4,0 a4,4 0,1 0,8 0,a4,4 0,1 0,-8 0" />
+
+    <!-- Subtle dashed circular orbit ring (thin stroked circle, low opacity) -->
+    <!-- Represents grid motion orbit -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.9"
+        android:strokeAlpha="0.35"
+        android:strokeLineCap="round"
+        android:pathData="M12,12m -7.5,0 a7.5,7.5 0,1 0,15 0,a7.5,7.5 0,1 0,-15 0" />
+
+    <!-- Dashed effect overlay: 12 small gaps simulated by overlaying 4 arc segments -->
+    <!-- Alternate approach: use 4 satellite dots as motion indicators (lower opacity) -->
+
+    <!-- Top satellite dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.62"
+        android:pathData="M12,4.5m -1.25,0 a1.25,1.25 0,1 0,2.5 0,a1.25,1.25 0,1 0,-2.5 0" />
+
+    <!-- Right satellite dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M19.5,12m -1.25,0 a1.25,1.25 0,1 0,2.5 0,a1.25,1.25 0,1 0,-2.5 0" />
+
+    <!-- Bottom satellite dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.48"
+        android:pathData="M12,19.5m -1.25,0 a1.25,1.25 0,1 0,2.5 0,a1.25,1.25 0,1 0,-2.5 0" />
+
+    <!-- Left satellite dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M4.5,12m -1.25,0 a1.25,1.25 0,1 0,2.5 0,a1.25,1.25 0,1 0,-2.5 0" />
+
+</vector>

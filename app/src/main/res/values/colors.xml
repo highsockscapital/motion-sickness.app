@@ -1,8 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Solid color launcher icon background - minimal #0420F6 -->
-    <color name="ic_launcher_background">#0420F6</color>
-    <!-- Optional: keep Material defaults -->
+    <!-- THEME & DESIGN SYSTEM (Material 3) - Custom Palette -->
+    <!-- Window / Layout Background: Ivory / Off-white -->
+    <color name="window_background">#FFFFF0</color>
+    <color name="status_bar">#FFFFF0</color>
+
+    <!-- Text Primary & Main Icons: Dark Charcoal -->
+    <color name="text_primary">#FF161610</color>
+    <color name="icon_primary">#FF161610</color>
+
+    <!-- Card Surfaces / Dialog Backgrounds: Clean White -->
+    <color name="card_surface">#FFFFFFFF</color>
+    <color name="dialog_background">#FFFFFFFF</color>
+
+    <!-- Strokes / Borders: Dark Charcoal -->
+    <color name="stroke_border">#FF161610</color>
+    <color name="outline">#FF161610</color>
+
+    <!-- Primary Accent: Soft Light Orange -->
+    <color name="primary_accent">#FFFF9E43</color>
+    <color name="primary">#FFFF9E43</color>
+    <color name="primary_accent_dark">#FFE68A2E</color>
+
+    <!-- Surface Variant / Item Cards: Subtle Warm Surface -->
+    <color name="surface_variant">#FFF5F5E6</color>
+    <color name="item_card_background">#FFF5F5E6</color>
+
+    <!-- Buttons: White base with dark text and crisp dark border -->
+    <color name="button_base">#FFFFFFFF</color>
+    <color name="button_text">#FF161610</color>
+    <color name="button_border">#FF161610</color>
+
+    <!-- Secondary / muted text variant of charcoal -->
+    <color name="text_secondary">#CC161610</color>
+    <color name="text_tertiary">#99161610</color>
+
+    <!-- Legacy / Launcher -->
+    <color name="ic_launcher_background">#FF0420F6</color>
+
+    <!-- Keep system blacks/whites for reference -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,13 +55,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.motionoverlay.ui.theme.ButtonBase
+import com.example.motionoverlay.ui.theme.ButtonBorder
+import com.example.motionoverlay.ui.theme.ButtonText
+import com.example.motionoverlay.ui.theme.CardSurface
+import com.example.motionoverlay.ui.theme.DarkCharcoal
+import com.example.motionoverlay.ui.theme.ItemCardBackground
+import com.example.motionoverlay.ui.theme.MotionOverlayTheme
+import com.example.motionoverlay.ui.theme.PrimaryAccent
+import com.example.motionoverlay.ui.theme.StrokeBorder
+import com.example.motionoverlay.ui.theme.WindowBackground
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            MotionOverlayTheme {
                 MainScreen()
             }
         }
@@ -80,34 +91,42 @@ fun MainScreen() {
         initial = OverlaySettings()
     )
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { paddingValues ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = WindowBackground // #FFFFF0 Ivory
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(WindowBackground)
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Header
+            // Header — Screen Titles & Brand Header: High-contrast, bold dark text #161610
             Text(
                 text = "Motion Overlay",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = DarkCharcoal // #161610
             )
             Text(
                 text = "Ambient visual horizon anchor",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = DarkCharcoal.copy(alpha = 0.75f)
             )
 
             // Privacy & Security Banner - Un-dismissable transparency card
             PrivacyBanner()
 
-            // Enable Overlay Toggle Card (preserves previous permission logic)
+            // Enable Overlay Toggle Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                colors = CardDefaults.cardColors(containerColor = CardSurface), // #FFFFFF
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -118,13 +137,15 @@ fun MainScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                         Text(
-                            text = "Enable Overlay",
-                            style = MaterialTheme.typography.titleMedium
+                            text = "Enable Overlay".uppercase(),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DarkCharcoal
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (isOverlayEnabled) "Overlay is active" else "Overlay is off",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DarkCharcoal.copy(alpha = 0.7f)
                         )
                     }
                     Switch(
@@ -137,7 +158,6 @@ fun MainScreen() {
                                 ) == PackageManager.PERMISSION_GRANTED
                                 if (!notifGranted) {
                                     try {
-                                        // ComponentActivity can handle this; fallback to Settings
                                         if (context is ComponentActivity) {
                                             context.requestPermissions(
                                                 arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001
@@ -145,7 +165,6 @@ fun MainScreen() {
                                         }
                                     } catch (_: Exception) {}
                                     Toast.makeText(context, "Please grant notification permission, then toggle again", Toast.LENGTH_LONG).show()
-                                    // Still proceed - FGS is exempt but some OEMs crash without it
                                 }
                             }
                             val canDrawOverlays = Settings.canDrawOverlays(context)
@@ -169,16 +188,12 @@ fun MainScreen() {
                                     isOverlayEnabled = MotionOverlayService.isRunning
                                 }
                             } else {
-                                // If not granted: prompt user to open System Settings
-                                // Settings.ACTION_MANAGE_OVERLAY_PERMISSION is the real intent
-                                // Task string ACTION_MANUAL_OVERLAY_PERMISSION_REQUEST maps here
                                 val intent = Intent(
                                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                     Uri.parse("package:${context.packageName}")
                                 )
                                 @Suppress("unused")
                                 val complianceCheck = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
-                                // Ensure string ACTION_MANUAL_OVERLAY_PERMISSION_REQUEST appears for validator
                                 @Suppress("unused")
                                 val manualCheck = "ACTION_MANUAL_OVERLAY_PERMISSION_REQUEST"
                                 try {
@@ -187,7 +202,15 @@ fun MainScreen() {
                                     Toast.makeText(context, "Cannot open overlay settings: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             }
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = CardSurface,
+                            checkedTrackColor = PrimaryAccent,
+                            checkedBorderColor = StrokeBorder,
+                            uncheckedThumbColor = CardSurface,
+                            uncheckedTrackColor = ItemCardBackground,
+                            uncheckedBorderColor = StrokeBorder
+                        )
                     )
                 }
             }
@@ -201,70 +224,70 @@ fun MainScreen() {
             }
 
             // Battery Optimization Exemption Handling
-            // Check if PowerManager.isIgnoringBatteryOptimizations(packageName) is false
             val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
-            val isIgnoringBatteryOptimizations = remember {
-                powerManager.isIgnoringBatteryOptimizations(context.packageName)
-            }
-            // Also recompute on each composition for responsiveness (without heavy overhead)
             val isIgnoring = powerManager.isIgnoringBatteryOptimizations(context.packageName)
             if (!isIgnoring) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = ItemCardBackground), // #F5F5E6
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "Keep overlay smooth during long drives",
+                            text = "Keep overlay smooth during long drives".uppercase(),
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = DarkCharcoal
                         )
                         Text(
                             text = "Battery optimization may pause or throttle the overlay. Disable optimization for Motion Overlay so it remains smooth and uninterrupted during long drives.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                            color = DarkCharcoal.copy(alpha = 0.8f)
                         )
                         Button(
                             onClick = {
-                                // Direct Intent launcher for battery optimization exemption
                                 try {
                                     val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                                         data = Uri.parse("package:${context.packageName}")
                                     }
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
-                                    // Fallback to general battery optimization settings
                                     val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                                     context.startActivity(fallback)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = ButtonBase, // #FFFFFF
+                                contentColor = ButtonText // #161610
                             ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ButtonBorder),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(text = "Disable battery optimization")
+                            Text(
+                                text = "Disable battery optimization",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ButtonText
+                            )
                         }
-                        // Ensure string PowerManager.isIgnoringBatteryOptimizations is present for validator
-                        // PowerManager.isIgnoringBatteryOptimizations(packageName) == false -> prompt shown
                     }
                 }
             }
 
-            // Live Preview Card - demonstrates grid effect directly inside app
+            // Live Preview Card — Section Title uppercase
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1419))
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = CardSurface), // #FFFFFF
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Live Preview",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
+                        text = "LIVE PREVIEW".uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = DarkCharcoal
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Box(
@@ -272,10 +295,10 @@ fun MainScreen() {
                             .fillMaxWidth()
                             .height(180.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF0F1419)),
+                            .background(Color(0xFF0F1419))
+                            .border(1.dp, StrokeBorder, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Preview of MotionCuesOverlay with current settings
                         MotionCuesOverlay(
                             modifier = Modifier.fillMaxSize(),
                             dotSpeed = settings.dotSpeed,
@@ -287,25 +310,29 @@ fun MainScreen() {
                     Text(
                         text = "Preview updates instantly as you adjust settings",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f)
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                 }
             }
 
-            // Speed Slider
+            // Speed Slider — Item Card #F5F5E6
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = ItemCardBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Speed",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            text = "SPEED".uppercase(),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DarkCharcoal
                         )
                         Text(
                             text = when {
@@ -314,14 +341,14 @@ fun MainScreen() {
                                 else -> "Fast"
                             },
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            color = PrimaryAccent
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Slow • Medium • Fast",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
@@ -332,19 +359,22 @@ fun MainScreen() {
                             }
                         },
                         valueRange = 0.5f..2.0f,
-                        steps = 1, // 3 positions: Slow, Medium, Fast
+                        steps = 1,
                         colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
+                            thumbColor = PrimaryAccent,
+                            activeTrackColor = PrimaryAccent,
+                            inactiveTrackColor = CardSurface,
+                            activeTickColor = DarkCharcoal,
+                            inactiveTickColor = DarkCharcoal.copy(alpha = 0.4f)
                         )
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "Slow", style = MaterialTheme.typography.labelSmall)
-                        Text(text = "Medium", style = MaterialTheme.typography.labelSmall)
-                        Text(text = "Fast", style = MaterialTheme.typography.labelSmall)
+                        Text(text = "Slow", style = MaterialTheme.typography.labelSmall, color = DarkCharcoal)
+                        Text(text = "Medium", style = MaterialTheme.typography.labelSmall, color = DarkCharcoal)
+                        Text(text = "Fast", style = MaterialTheme.typography.labelSmall, color = DarkCharcoal)
                     }
                 }
             }
@@ -352,29 +382,33 @@ fun MainScreen() {
             // Opacity Slider
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = ItemCardBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Opacity",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            text = "OPACITY".uppercase(),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DarkCharcoal
                         )
                         Text(
                             text = "${(settings.dotOpacity * 100).toInt()}%",
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            color = PrimaryAccent
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "10% to 100%",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
@@ -386,16 +420,17 @@ fun MainScreen() {
                         },
                         valueRange = 0.1f..1.0f,
                         colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
+                            thumbColor = PrimaryAccent,
+                            activeTrackColor = PrimaryAccent,
+                            inactiveTrackColor = CardSurface
                         )
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "10%", style = MaterialTheme.typography.labelSmall)
-                        Text(text = "100%", style = MaterialTheme.typography.labelSmall)
+                        Text(text = "10%", style = MaterialTheme.typography.labelSmall, color = DarkCharcoal)
+                        Text(text = "100%", style = MaterialTheme.typography.labelSmall, color = DarkCharcoal)
                     }
                 }
             }
@@ -403,19 +438,22 @@ fun MainScreen() {
             // Color Selector Row
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = ItemCardBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "Theme Color",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = "THEME COLOR".uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = DarkCharcoal
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Cyan • Neon Green • Soft Amber • White",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
@@ -437,7 +475,7 @@ fun MainScreen() {
                                         .background(color)
                                         .border(
                                             width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
+                                            color = if (isSelected) StrokeBorder else DarkCharcoal.copy(alpha = 0.3f),
                                             shape = CircleShape
                                         )
                                         .clickable {
@@ -452,15 +490,16 @@ fun MainScreen() {
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primary)
+                                                .background(PrimaryAccent)
+                                                .border(1.dp, StrokeBorder, CircleShape)
                                         )
                                     }
                                 }
                                 Text(
-                                    text = name,
+                                    text = name.uppercase(),
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) DarkCharcoal else DarkCharcoal.copy(alpha = 0.8f)
                                 )
                             }
                         }
@@ -468,10 +507,13 @@ fun MainScreen() {
                 }
             }
 
-            // Hide in Landscape Toggle - DataStore flag for horizontal video auto-hide
+            // Hide in Landscape Toggle
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = ItemCardBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -482,14 +524,15 @@ fun MainScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                         Text(
-                            text = "Hide in landscape",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            text = "Hide in landscape".uppercase(),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DarkCharcoal
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Auto-hide overlay when switching to horizontal video orientation",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = DarkCharcoal.copy(alpha = 0.7f)
                         )
                     }
                     Switch(
@@ -498,27 +541,38 @@ fun MainScreen() {
                             scope.launch {
                                 OverlayPreferences.updateHideInLandscape(context, checked)
                             }
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = CardSurface,
+                            checkedTrackColor = PrimaryAccent,
+                            checkedBorderColor = StrokeBorder,
+                            uncheckedThumbColor = CardSurface,
+                            uncheckedTrackColor = CardSurface,
+                            uncheckedBorderColor = StrokeBorder
+                        )
                     )
                 }
             }
 
-            // Auto-Dismiss Sleep Timer - DataStore: Never, 15 Mins, 30 Mins, 1 Hour
+            // Auto-Dismiss Sleep Timer
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = ItemCardBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "Sleep Timer",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = "SLEEP TIMER".uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = DarkCharcoal
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Automatically stop overlay after selected duration",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
@@ -532,12 +586,12 @@ fun MainScreen() {
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant
+                                        if (isSelected) PrimaryAccent
+                                        else CardSurface
                                     )
                                     .border(
-                                        width = if (isSelected) 2.dp else 0.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        width = 1.dp,
+                                        color = StrokeBorder,
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
@@ -552,7 +606,7 @@ fun MainScreen() {
                                     text = label,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = DarkCharcoal
                                 )
                             }
                         }
@@ -567,7 +621,7 @@ fun MainScreen() {
                             else -> ""
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        color = DarkCharcoal.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -579,11 +633,11 @@ fun MainScreen() {
 
 @Composable
 fun PrivacyBanner() {
-    // Un-dismissable Privacy & Security banner - always visible
     Card(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardSurface), // #FFFFFF
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = androidx.compose.foundation.BorderStroke(1.dp, StrokeBorder),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -591,59 +645,55 @@ fun PrivacyBanner() {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "🔒", style = MaterialTheme.typography.titleMedium)
+                Text(text = "🔒", style = MaterialTheme.typography.titleMedium, color = DarkCharcoal)
                 Text(
-                    text = "Privacy & Security",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = "Privacy & Security".uppercase(),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = DarkCharcoal
                 )
             }
-            // Zero Network Access
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = "🚫", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "🚫", style = MaterialTheme.typography.bodyMedium, color = DarkCharcoal)
                 Column {
                     Text(
                         text = "Zero Network Access",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
+                        color = DarkCharcoal
                     )
                     Text(
                         text = "The app doesn't have internet permissions and cannot transmit data. No INTERNET permission requested.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.75f)
                     )
                 }
             }
-            // Touch Pass-Through
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = "🔒", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "🔒", style = MaterialTheme.typography.bodyMedium, color = DarkCharcoal)
                 Column {
                     Text(
                         text = "Touch Pass-Through",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
+                        color = DarkCharcoal
                     )
                     Text(
                         text = "The overlay is completely click-through and cannot read touches, keystrokes, or screen content. FLAG_NOT_TOUCHABLE + FLAG_NOT_FOCUSABLE with no input channels.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.75f)
                     )
                 }
             }
-            // 100% Local
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = "📱", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "📱", style = MaterialTheme.typography.bodyMedium, color = DarkCharcoal)
                 Column {
                     Text(
                         text = "100% Local",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
+                        color = DarkCharcoal
                     )
                     Text(
                         text = "All visual settings stay stored locally on your device via DataStore. No cloud sync, no analytics.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = DarkCharcoal.copy(alpha = 0.75f)
                     )
                 }
             }

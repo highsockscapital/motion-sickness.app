@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -103,7 +104,8 @@ class MotionOverlayService : LifecycleService() {
         isRunning = true
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
-        attachOverlay()
+        // attachOverlay() is deliberately NOT called here - must be after startForeground
+        // on Android 14+/16 strict FGS timeout. It will be called in onStartCommand.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -118,16 +120,52 @@ class MotionOverlayService : LifecycleService() {
             return START_NOT_STICKY
         }
 
-        val notification = createNotification()
+        val notification = try {
+            createNotification()
+        } catch (e: Exception) {
+            android.util.Log.e("MotionOverlayService", "createNotification failed", e)
+            // Fallback minimal notification to avoid FGS crash
+            NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Motion Overlay Active")
+                .setSmallIcon(android.R.drawable.ic_menu_gallery)
+                .setOngoing(true)
+                .build()
+        }
         // For Android 14+, specify foregroundServiceType with fallback for target SDK 34+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MotionOverlayService", "startForeground failed (POST_NOTIFICATIONS? FGS type?)", e)
+            // On Android 13+/16, POST_NOTIFICATIONS may be required; try without type
+            try {
+                startForeground(NOTIFICATION_ID, notification)
+            } catch (e2: Exception) {
+                android.util.Log.e("MotionOverlayService", "second startForeground also failed", e2)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+
+        // Now safe to attach overlay after FGS is established (avoids FGS timeout crash)
+        try {
+            attachOverlay()
+        } catch (e: SecurityException) {
+            android.util.Log.e("MotionOverlayService", "attachOverlay SecurityException (overlay permission?)", e)
+            stopSelf()
+            requestTileUpdateToOff()
+            return START_NOT_STICKY
+        } catch (e: Exception) {
+            android.util.Log.e("MotionOverlayService", "attachOverlay failed", e)
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         // Schedule lightweight Coroutine countdown for auto-dismiss sleep timer
@@ -239,6 +277,13 @@ class MotionOverlayService : LifecycleService() {
     private fun attachOverlay() {
         if (overlayView != null) return
 
+        // Defensive check: ensure overlay permission before adding view to avoid BadToken crash
+        if (!Settings.canDrawOverlays(this)) {
+            android.util.Log.w("MotionOverlayService", "canDrawOverlays=false, aborting attachOverlay")
+            stopSelf()
+            return
+        }
+
         // Strict privacy: overlay must be purely visual - no input capture
         // Verify WindowManager.LayoutParams strictly includes FLAG_NOT_TOUCHABLE and FLAG_NOT_FOCUSABLE
         // Explicitly ensure NO input channels or touch listener capabilities are attached
@@ -248,14 +293,23 @@ class MotionOverlayService : LifecycleService() {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
-        )
+        ).apply {
+            // Ensure window is not focusable and not touchable on Android 16
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // no extra flags needed
+            }
+        }
 
         val composeView = ComposeView(this).apply {
             // Required so Compose can observe lifecycle in a Service context
-            setViewTreeLifecycleOwner(this@MotionOverlayService)
-            setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner)
-            // ViewModelStore is needed for viewModel() support inside overlay
-            setViewTreeViewModelStoreOwner(viewModelStoreOwner)
+            try {
+                setViewTreeLifecycleOwner(this@MotionOverlayService)
+                setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner)
+                // ViewModelStore is needed for viewModel() support inside overlay
+                setViewTreeViewModelStoreOwner(viewModelStoreOwner)
+            } catch (e: Exception) {
+                android.util.Log.e("MotionOverlayService", "setViewTree owners failed", e)
+            }
             // Privacy enforcement: Explicitly ensure NO input channels or touch listeners
             // DO NOT set onTouchListener, onClickListener, or focusable - overlay must remain click-through
             isClickable = false
@@ -275,8 +329,19 @@ class MotionOverlayService : LifecycleService() {
             }
         }
 
-        overlayView = composeView
-        windowManager.addView(composeView, params)
+        try {
+            overlayView = composeView
+            windowManager.addView(composeView, params)
+            android.util.Log.i("MotionOverlayService", "overlay attached successfully")
+        } catch (e: SecurityException) {
+            android.util.Log.e("MotionOverlayService", "addView SecurityException (overlay perm denied)", e)
+            overlayView = null
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("MotionOverlayService", "addView failed", e)
+            overlayView = null
+            throw e
+        }
     }
 
     private fun detachOverlay() {

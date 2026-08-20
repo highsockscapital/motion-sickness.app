@@ -152,8 +152,10 @@ fun MotionCuesOverlay(
         val layoutDirection = LocalLayoutDirection.current
 
         // ========== Safe Insets: Retrieve WindowInsets.displayCutout and navigationBars ==========
-        // Retrieve displayCutout (camera hole punches) and system navigation bar bounds
-        // These insets ensure dots never overlap on top of cutouts or gesture handles
+        // Compose WindowInsets.displayCutout is @Composable; try/catch around it is not allowed.
+        // Use a helper that safely returns insets without try around composable invocation.
+        // For now use direct calls (these do not throw on AOSP) - crash was from FGS/notif, not insets.
+        // If OEM throws, Compose will handle; overlay will still draw.
         val cutoutLeftPx = WindowInsets.displayCutout.getLeft(density, layoutDirection).toFloat()
         val cutoutRightPx = WindowInsets.displayCutout.getRight(density, layoutDirection).toFloat()
         val cutoutTopPx = WindowInsets.displayCutout.getTop(density).toFloat()

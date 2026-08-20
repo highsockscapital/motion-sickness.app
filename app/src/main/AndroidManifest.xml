@@ -14,6 +14,9 @@
     <!-- Needed to request battery optimization exemption for smooth long-drive overlay -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Required for notifications on Android 13+ (foreground service notification) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"

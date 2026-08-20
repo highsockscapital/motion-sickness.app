@@ -1,14 +1,18 @@
 package com.example.motionoverlay
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -126,18 +130,43 @@ fun MainScreen() {
                     Switch(
                         checked = isOverlayEnabled,
                         onCheckedChange = { checked ->
+                            // On Android 13+, notification permission is needed for FGS notification
+                            if (checked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                val notifGranted = ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.POST_NOTIFICATIONS
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (!notifGranted) {
+                                    try {
+                                        // ComponentActivity can handle this; fallback to Settings
+                                        if (context is ComponentActivity) {
+                                            context.requestPermissions(
+                                                arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001
+                                            )
+                                        }
+                                    } catch (_: Exception) {}
+                                    Toast.makeText(context, "Please grant notification permission, then toggle again", Toast.LENGTH_LONG).show()
+                                    // Still proceed - FGS is exempt but some OEMs crash without it
+                                }
+                            }
                             val canDrawOverlays = Settings.canDrawOverlays(context)
                             if (canDrawOverlays) {
-                                isOverlayEnabled = checked
                                 val serviceIntent = Intent(context, MotionOverlayService::class.java)
-                                if (checked) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        context.startForegroundService(serviceIntent)
+                                try {
+                                    if (checked) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            context.startForegroundService(serviceIntent)
+                                        } else {
+                                            context.startService(serviceIntent)
+                                        }
+                                        isOverlayEnabled = true
                                     } else {
-                                        context.startService(serviceIntent)
+                                        context.stopService(serviceIntent)
+                                        isOverlayEnabled = false
                                     }
-                                } else {
-                                    context.stopService(serviceIntent)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("MainActivity", "start/stop service failed", e)
+                                    Toast.makeText(context, "Failed to toggle overlay: ${e.message}", Toast.LENGTH_LONG).show()
+                                    isOverlayEnabled = MotionOverlayService.isRunning
                                 }
                             } else {
                                 // If not granted: prompt user to open System Settings
@@ -152,7 +181,11 @@ fun MainScreen() {
                                 // Ensure string ACTION_MANUAL_OVERLAY_PERMISSION_REQUEST appears for validator
                                 @Suppress("unused")
                                 val manualCheck = "ACTION_MANUAL_OVERLAY_PERMISSION_REQUEST"
-                                context.startActivity(intent)
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Cannot open overlay settings: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     )

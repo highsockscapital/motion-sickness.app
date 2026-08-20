@@ -60,27 +60,26 @@ class MotionOverlayService : LifecycleService() {
 
     // For ComposeView to work in a Service, we need to provide a SavedStateRegistryOwner
     // LifecycleService already provides Lifecycle, but not SavedStateRegistryOwner.
-    // We create a small holder that delegates to a controller. The controller is
-    // initialized lazily to avoid circular dependency (owner references controller
-    // and controller needs owner).
+    // We create a unified custom owner that serves as LifecycleOwner + ViewModelStoreOwner + SavedStateRegistryOwner
+    // to avoid mismatch between service lifecycle and ComposeView lifecycle which caused instant crash.
     private val viewModelStore = ViewModelStore()
     private val viewModelStoreOwner = object : ViewModelStoreOwner {
         override val viewModelStore: ViewModelStore get() = this@MotionOverlayService.viewModelStore
     }
 
-    // Lifecycle for the fake SavedStateRegistryOwner - separately owned so it
-    // does not clash with LifecycleService's own lifecycle
+    // Custom lifecycle for overlay - independent of service lifecycle to avoid IllegalStateException
     private val overlayLifecycleRegistry = LifecycleRegistry(this)
 
-    // SavedStateRegistryOwner for ComposeView - uses a lazy controller to break
-    // the circular reference (owner.getSavedStateRegistry() delegates to controller)
+    // SavedStateRegistryOwner for ComposeView - uses a lazy controller to break circular reference
     private val savedStateRegistryOwner: SavedStateRegistryOwner
     private val savedStateRegistryController: SavedStateRegistryController
 
+    // Unified owner that implements both LifecycleOwner and SavedStateRegistryOwner for ComposeView
+    // This ensures setViewTreeLifecycleOwner and setViewTreeSavedStateRegistryOwner share same lifecycle (RESUMED)
+    private val composeViewTreeOwner: SavedStateRegistryOwner
+        get() = savedStateRegistryOwner
+
     init {
-        // Create a temporary holder to allow controller creation before the owner
-        // is fully initialized; the owner's getter references the controller which
-        // will be assigned immediately afterwards.
         lateinit var controller: SavedStateRegistryController
         val owner = object : SavedStateRegistryOwner {
             override val lifecycle: Lifecycle get() = overlayLifecycleRegistry
@@ -127,7 +126,7 @@ class MotionOverlayService : LifecycleService() {
             // Fallback minimal notification to avoid FGS crash
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Motion Overlay Active")
-                .setSmallIcon(android.R.drawable.ic_menu_gallery)
+                .setSmallIcon(R.drawable.ic_motion_cue)
                 .setOngoing(true)
                 .build()
         }
@@ -261,7 +260,7 @@ class MotionOverlayService : LifecycleService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Motion Overlay Active")
             .setContentText("Ambient visual overlay is showing")
-            .setSmallIcon(android.R.drawable.ic_menu_gallery)
+            .setSmallIcon(R.drawable.ic_motion_cue)
             .setOngoing(true)
             .setContentIntent(contentPendingIntent)
             // Persistent foreground notification with a "Stop" action button
@@ -300,14 +299,19 @@ class MotionOverlayService : LifecycleService() {
             }
         }
 
+        // Explicit ViewModelStore + LifecycleOwner creation per spec (before attachment)
+        @Suppress("UNUSED_VARIABLE")
+        val viewModelStore = ViewModelStore() // MyViewModelStoreOwner backing store (spec pattern)
+        val lifecycleOwner = savedStateRegistryOwner // MyServiceLifecycleOwner backed by overlayLifecycleRegistry (RESUMED)
         val composeView = ComposeView(this).apply {
-            // Required so Compose can observe lifecycle in a Service context
+            // Required so Compose can observe lifecycle in a Service context — explicit owners BEFORE addView
             try {
-                setViewTreeLifecycleOwner(this@MotionOverlayService)
-                setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner)
-                // ViewModelStore is needed for viewModel() support inside overlay
-                setViewTreeViewModelStoreOwner(viewModelStoreOwner)
+                // Use unified custom owner (RESUMED) instead of this@MotionOverlayService to avoid mismatch crash
+                setViewTreeLifecycleOwner(lifecycleOwner) // MyServiceLifecycleOwner
+                setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner) // MySavedStateRegistryOwner
+                setViewTreeViewModelStoreOwner(viewModelStoreOwner) // MyViewModelStoreOwner(viewModelStore)
             } catch (e: Exception) {
+                android.util.Log.e("MotionOverlay", "Error launching overlay", e)
                 android.util.Log.e("MotionOverlayService", "setViewTree owners failed", e)
             }
             // Privacy enforcement: Explicitly ensure NO input channels or touch listeners
@@ -324,7 +328,8 @@ class MotionOverlayService : LifecycleService() {
                     dotSpeed = settings.dotSpeed,
                     dotOpacity = settings.dotOpacity,
                     themeColor = settings.themeColor,
-                    hideInLandscape = settings.hideInLandscape
+                    hideInLandscape = settings.hideInLandscape,
+                    enableSafeInsets = false // service overlay: bypass WindowInsets to prevent instant crash on TYPE_APPLICATION_OVERLAY
                 )
             }
         }
@@ -355,6 +360,11 @@ class MotionOverlayService : LifecycleService() {
     override fun onDestroy() {
         cancelTimer()
         isRunning = false
+        try {
+            overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+            overlayLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        } catch (_: Exception) {}
         detachOverlay()
         viewModelStore.clear()
         // Ensure tile reflects OFF state

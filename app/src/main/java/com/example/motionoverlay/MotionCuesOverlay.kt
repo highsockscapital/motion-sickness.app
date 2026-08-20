@@ -56,7 +56,8 @@ fun MotionCuesOverlay(
     dotSpeed: Float = 1.0f, // Slow 0.5f, Medium 1.0f, Fast 2.0f - from DataStore
     dotOpacity: Float = 0.85f, // 0.1f to 1.0f - from DataStore
     themeColor: Int = OverlaySettings.CYAN, // Cyan, Neon Green, Soft Amber, White - from DataStore
-    hideInLandscape: Boolean = false // DataStore flag: auto-hide in horizontal video orientation
+    hideInLandscape: Boolean = false, // DataStore flag: auto-hide in horizontal video orientation
+    enableSafeInsets: Boolean = true // false for service overlay to avoid WindowInsets crash on TYPE_APPLICATION_OVERLAY
 ) {
     // ========== Graphics Optimization: Pre-allocate Paint, Colors, Math outside DrawScope ==========
     // Paint objects pre-allocated once and reused - avoids allocation per frame
@@ -152,24 +153,39 @@ fun MotionCuesOverlay(
         val layoutDirection = LocalLayoutDirection.current
 
         // ========== Safe Insets: Retrieve WindowInsets.displayCutout and navigationBars ==========
-        // Compose WindowInsets.displayCutout is @Composable; try/catch around it is not allowed.
-        // Use a helper that safely returns insets without try around composable invocation.
-        // For now use direct calls (these do not throw on AOSP) - crash was from FGS/notif, not insets.
-        // If OEM throws, Compose will handle; overlay will still draw.
-        val cutoutLeftPx = WindowInsets.displayCutout.getLeft(density, layoutDirection).toFloat()
-        val cutoutRightPx = WindowInsets.displayCutout.getRight(density, layoutDirection).toFloat()
-        val cutoutTopPx = WindowInsets.displayCutout.getTop(density).toFloat()
-        val cutoutBottomPx = WindowInsets.displayCutout.getBottom(density).toFloat()
-
-        val navLeftPx = WindowInsets.navigationBars.getLeft(density, layoutDirection).toFloat()
-        val navRightPx = WindowInsets.navigationBars.getRight(density, layoutDirection).toFloat()
-        val navTopPx = WindowInsets.navigationBars.getTop(density).toFloat()
-        val navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-
-        val statusLeftPx = WindowInsets.statusBars.getLeft(density, layoutDirection).toFloat()
-        val statusRightPx = WindowInsets.statusBars.getRight(density, layoutDirection).toFloat()
-        val statusTopPx = WindowInsets.statusBars.getTop(density).toFloat()
-        val statusBottomPx = WindowInsets.statusBars.getBottom(density).toFloat()
+        // For service overlay (TYPE_APPLICATION_OVERLAY), WindowInsets may be unavailable or throw.
+        // Use enableSafeInsets flag to bypass WindowInsets entirely for service (0 insets) to prevent instant crash.
+        val cutoutLeftPx: Float
+        val cutoutRightPx: Float
+        val cutoutTopPx: Float
+        val cutoutBottomPx: Float
+        val navLeftPx: Float
+        val navRightPx: Float
+        val navTopPx: Float
+        val navBottomPx: Float
+        val statusLeftPx: Float
+        val statusRightPx: Float
+        val statusTopPx: Float
+        val statusBottomPx: Float
+        if (enableSafeInsets) {
+            cutoutLeftPx = WindowInsets.displayCutout.getLeft(density, layoutDirection).toFloat()
+            cutoutRightPx = WindowInsets.displayCutout.getRight(density, layoutDirection).toFloat()
+            cutoutTopPx = WindowInsets.displayCutout.getTop(density).toFloat()
+            cutoutBottomPx = WindowInsets.displayCutout.getBottom(density).toFloat()
+            navLeftPx = WindowInsets.navigationBars.getLeft(density, layoutDirection).toFloat()
+            navRightPx = WindowInsets.navigationBars.getRight(density, layoutDirection).toFloat()
+            navTopPx = WindowInsets.navigationBars.getTop(density).toFloat()
+            navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+            statusLeftPx = WindowInsets.statusBars.getLeft(density, layoutDirection).toFloat()
+            statusRightPx = WindowInsets.statusBars.getRight(density, layoutDirection).toFloat()
+            statusTopPx = WindowInsets.statusBars.getTop(density).toFloat()
+            statusBottomPx = WindowInsets.statusBars.getBottom(density).toFloat()
+        } else {
+            // Service overlay: no insets to avoid WindowInsets crash on TYPE_APPLICATION_OVERLAY
+            cutoutLeftPx = 0f; cutoutRightPx = 0f; cutoutTopPx = 0f; cutoutBottomPx = 0f
+            navLeftPx = 0f; navRightPx = 0f; navTopPx = 0f; navBottomPx = 0f
+            statusLeftPx = 0f; statusRightPx = 0f; statusTopPx = 0f; statusBottomPx = 0f
+        }
 
         // Combine insets: take maximum of cutout, navigation, and status bars to ensure safe area
         // This guarantees dots avoid camera punch holes AND gesture navigation handles
